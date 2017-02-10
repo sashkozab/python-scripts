@@ -153,8 +153,7 @@ def execute_shell_command(command):
 
 def main():
     messages_sets = get_messages(SERVER_SETS)
-    for i,msg_set in enumerate(messages_sets):
-        if i < 4:continue
+    for msg_set in messages_sets:
         msg_filename = msg_set[0]
         print(msg_filename)
         encrypt_command = commands["encrypt_message"].format(get_recipients_with_arg(msg_set[2]), msg_filename)
