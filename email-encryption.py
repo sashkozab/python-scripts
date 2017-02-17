@@ -25,12 +25,14 @@ from customSettings import SERVER_SETS
     "/path/to/my/mail.com":{
         "ACCOUNTS" : ["justin"],
         "EMAIL_DIRS" : ["cur"],
+        "EXCLUDE_DIRS" : [".Drafts"],
         "boundary" : "8kjkgKkjfgJhLJL3mMk6pnTeNrhR",
         "public_keys" : ["896716TM"]
     },
     "/path/to/another/somemail.com":{
         "ACCOUNTS" : ["sam", "john"],
-        "EMAIL_DIRS" : ["cur", "new", ".Sent"],
+        "EMAIL_DIRS" : ["cur", "new"],
+        "EXCLUDE_DIRS" : [".Drafts"],
         "boundary" : "8kjkgKkjfgJhLJLklk::LK:5KJKHl",
         "public_keys" : ["896716TM", "651234VD"]
     },
@@ -45,12 +47,14 @@ from customSettings import SERVER_SETS
 #     "/path/to/my/mail.com":{
 #         "ACCOUNTS" : ["justin"],
 #         "EMAIL_DIRS" : ["cur"],
+#         "EXCLUDE_DIRS" : [".Drafts"],
 #         "boundary" : "8kjkgKkjfgJhLJL3mMk6pnTeNrhR",
 #         "public_keys" : ["896716TM"]
 #     },
 #     "/path/to/another/somemail.com":{
 #         "ACCOUNTS" : ["sam", "john"],
-#         "EMAIL_DIRS" : ["cur", "new", ".Sent"],
+#         "EMAIL_DIRS" : ["cur", "new"],
+#         "EXCLUDE_DIRS" : [".Drafts"],
 #         "boundary" : "8kjkgKkjfgJhLJLklk::LK:5KJKHl",
 #         "public_keys" : ["896716TM", "651234VD"]
 #     }
@@ -104,12 +108,13 @@ def get_recipients_with_arg(public_keys):
 def get_messages(SERVER_SETS):
     for domain in SERVER_SETS.keys():
         for account in SERVER_SETS[domain]["ACCOUNTS"]:
-            for email_dir in SERVER_SETS[domain]["EMAIL_DIRS"]:
-                email_dir_path = os.path.join(domain, account, email_dir)
-                print("EMAIL_DIRECTORY=========>\n", email_dir_path, "\n================")
-                for msg_file in os.listdir(email_dir_path):
-                    messagePath = os.path.join(email_dir_path, msg_file)
-                    if os.path.isfile(messagePath):
+            for root, dirs, files in os.walk(os.path.join(domain, account)):
+                for exclude_dir in SERVER_SETS[domain]["EXCLUDE_DIRS"]:
+                    if exclude_dir in dirs:dirs.remove(exclude_dir)
+                for filename in files:
+                    if os.path.basename(root) in SERVER_SETS[domain]["EMAIL_DIRS"]:
+                        print("File to modify: ", filename)
+                        messagePath = os.path.join(root, filename)
                         msg = read_email_file(messagePath)
                         original_headers = get_original_headers(msg)
                         print(original_headers)
@@ -121,7 +126,7 @@ def get_messages(SERVER_SETS):
 
 def read_email_file(messagePath):
     with open(messagePath, "rb") as f:
-        print("Prarsing...")
+        print("Parsing...")
         msg = BytesParser(policy=policy.default).parse(f)
     return msg
 
@@ -143,9 +148,11 @@ def get_original_headers(parsedMessage):
     }
     return headers
 
+
 def write_wrapper_head(messagePath, WRAPPER, boundary):
     with open(messagePath, "w") as f:
         f.write(WRAPPER.format(boundary))
+
 
 def execute_shell_command(command):
     subprocess.call(command, shell=True)
@@ -155,7 +162,6 @@ def main():
     messages_sets = get_messages(SERVER_SETS)
     for msg_set in messages_sets:
         msg_filename = msg_set[0]
-        print(msg_filename)
         encrypt_command = commands["encrypt_message"].format(get_recipients_with_arg(msg_set[2]), msg_filename)
         execute_shell_command(encrypt_command)
         write_wrapper_head(msg_filename, WRAPPER, msg_set[1])
